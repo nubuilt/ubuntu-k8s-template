@@ -159,19 +159,19 @@ flowchart LR
 ## 💾 Partition Layout
 
 ```
-┌─────────────────────────────────────────────────┐
-│              40 GB Virtual Disk                  │
+┌──────────────────────────────────────────────────┐
+│                40 GB Virtual Disk                │
 ├──────────┬──────┬───────────┬────────────────────┤
-│   EFI    │/boot │  / (Root) │    /var             │
-│   1 GB   │ 2 GB │  15 GB    │    ~22 GB           │
-│          │ Ext4 │ Ext4/XFS  │    Ext4/XFS         │
-│ Boot     │Kernel│    OS     │ containerd images   │
-│ loader   │files │  files    │ kubelet data        │
-│          │      │           │ logs (journald)     │
-│          │      │           │ etcd data           │
+│   EFI    │/boot │  / (Root) │    /var            │
+│   1 GB   │ 2 GB │  15 GB    │    ~22 GB          │
+│          │ Ext4 │ Ext4/XFS  │    Ext4/XFS        │
+│ Boot     │Kernel│    OS     │ containerd images  │
+│ loader   │files │  files    │ kubelet data       │
+│          │      │           │ logs (journald)    │
+│          │      │           │ etcd data          │
 ├──────────┴──────┴───────────┴────────────────────┤
-│              ❌ NO SWAP PARTITION                 │
-└─────────────────────────────────────────────────┘
+│                 NO SWAP PARTITION                │
+└──────────────────────────────────────────────────┘
 ```
 
 > **Why separate `/var`?** If containers or logs fill up `/var`, the root filesystem stays intact — you can still SSH in and fix the problem.
