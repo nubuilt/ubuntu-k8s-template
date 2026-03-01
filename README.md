@@ -6,7 +6,7 @@
 [![VMware](https://img.shields.io/badge/Platform-VMware%20Workstation%20Pro-607078?logo=vmware&logoColor=white)](https://www.vmware.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **Production-grade SOP** for building a reusable Ubuntu 24.04 VM template optimized for Kubernetes clusters running high-performance web applications.
+> **SOP** for building a reusable Ubuntu 24.04 VM template optimized for Kubernetes clusters running high-performance web applications.
 
 ---
 
@@ -333,6 +333,20 @@ This is normal before installing a CNI plugin. Install Calico or Cilium, then no
 - [Containerd Getting Started](https://github.com/containerd/containerd/blob/main/docs/getting-started.md)
 - [CKA Certification Curriculum](https://github.com/cncf/curriculum)
 - [Ubuntu 24.04 Server Guide](https://ubuntu.com/server/docs)
+
+---
+
+## ⚠️ Disclaimer
+
+> **Warning:** The scripts in this repository are primarily designed for **Home Lab / CKA Practice** environments.
+>
+> If you plan to use them in a **Production** environment, please:
+> - ✅ Review and test all scripts in a staging environment before deployment
+> - ✅ Adjust IP addresses, DNS settings, and Kubernetes versions to match your infrastructure
+> - ✅ Verify your organization's security policies before disabling UFW or modifying system limits
+> - ✅ Always take a snapshot or backup before running any scripts
+>
+> The author assumes no responsibility for any damage caused by using these scripts without proper review.
 
 ---
 
