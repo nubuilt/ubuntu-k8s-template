@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+#===============================================================================
+# Phase 5: Cleanup & Sealing
+# Part of: Ubuntu 24.04 LTS — Kubernetes Node Template
+#
+# ⚠️  WARNING: This script will SHUTDOWN the VM at the end!
+#     It must be the LAST thing you run before cloning.
+#     Do NOT boot the VM again after this — go straight to cloning.
+#
+# Description:
+#   Cleans cloud-init state, removes machine-id (so cloned VMs get unique IDs),
+#   purges apt cache, and shuts down the machine for cloning.
+#
+# Usage:
+#   chmod +x phase5-cleanup.sh
+#   sudo ./phase5-cleanup.sh
+#===============================================================================
+
+set -euo pipefail
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+log_step() { echo -e "${GREEN}[PHASE 5]${NC} $1"; }
+log_warn() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+log_danger() { echo -e "${RED}[DANGER]${NC} $1"; }
+
+if [[ $EUID -ne 0 ]]; then
+    echo "This script must be run as root (use sudo)"
+    exit 1
+fi
+
+#---------------------------------------
+# Confirmation Prompt
+#---------------------------------------
+echo ""
+log_danger "============================================"
+log_danger "  ⚠️  THIS WILL SHUTDOWN THE VM!"
+log_danger "  Make sure Phases 2-4 are complete."
+log_danger "  After shutdown, do NOT boot again —"
+log_danger "  proceed directly to cloning."
+log_danger "============================================"
+echo ""
+read -rp "Type 'YES' to continue: " CONFIRM
+if [[ "$CONFIRM" != "YES" ]]; then
+    echo "Aborted."
+    exit 0
+fi
+
+#---------------------------------------
+# 5.1 Clean Cloud-init State
+#---------------------------------------
+log_step "Cleaning cloud-init state and logs..."
+if command -v cloud-init &> /dev/null; then
+    cloud-init clean --logs
+    log_step "✅ cloud-init cleaned"
+else
+    log_warn "cloud-init not found — skipping"
+fi
+
+#---------------------------------------
+# 5.2 Clear Machine ID
+#---------------------------------------
+log_step "Clearing machine-id for unique clone identity..."
+truncate -s 0 /etc/machine-id
+
+if [[ -f /var/lib/dbus/machine-id ]]; then
+    rm /var/lib/dbus/machine-id
+fi
+ln -sf /etc/machine-id /var/lib/dbus/machine-id
+
+log_step "✅ Machine ID cleared"
+
+#---------------------------------------
+# 5.3 Clean Apt Cache
+#---------------------------------------
+log_step "Cleaning apt cache and removing unused packages..."
+apt-get clean
+apt-get autoremove -y
+
+#---------------------------------------
+# 5.4 Remove SSH Host Keys
+#---------------------------------------
+log_step "Removing SSH host keys (will be regenerated on first boot)..."
+rm -f /etc/ssh/ssh_host_*
+
+#---------------------------------------
+# 5.5 Truncate System Logs
+#---------------------------------------
+log_step "Truncating old system logs..."
+find /var/log -type f -exec truncate -s 0 {} \; 2>/dev/null || true
+
+#---------------------------------------
+# 5.6 Clear bash history
+#---------------------------------------
+log_step "Clearing bash history..."
+history -c 2>/dev/null || true
+rm -f /root/.bash_history
+rm -f /home/*/.bash_history
+
+#---------------------------------------
+# Summary & Shutdown
+#---------------------------------------
+echo ""
+log_step "============================================"
+log_step "  Phase 5 Complete! ✅"
+log_step "  - cloud-init state cleaned"
+log_step "  - Machine ID cleared"
+log_step "  - Apt cache purged"
+log_step "  - SSH host keys removed"
+log_step "  - System logs truncated"
+log_step "  - Bash history cleared"
+log_step "============================================"
+echo ""
+log_step "🔌 Shutting down in 5 seconds..."
+log_step "   After shutdown → Clone this VM in VMware"
+sleep 5
+shutdown -h now
