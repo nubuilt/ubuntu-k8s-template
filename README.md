@@ -284,6 +284,7 @@ cat <<EOF | sudo tee -a /etc/hosts
 EOF
 
 # 4. On Control Plane only:
+# Note: Change the CIDR to match your CNI plugin (10.244.0.0/16 is typical for Flannel, 192.168.0.0/16 for Calico)
 sudo kubeadm init --pod-network-cidr=10.244.0.0/16
 
 # 5. Install CNI (e.g., Calico or Cilium)
