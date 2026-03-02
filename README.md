@@ -6,7 +6,7 @@
 [![VMware](https://img.shields.io/badge/Platform-VMware%20Workstation%20Pro-607078?logo=vmware&logoColor=white)](https://www.vmware.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **SOP** for building a reusable Ubuntu 24.04 VM template optimized for Kubernetes clusters running high-performance web applications.
+> **Production-grade SOP** for building a reusable Ubuntu 24.04 VM template optimized for Kubernetes clusters running high-performance web applications.
 
 ---
 
@@ -25,6 +25,7 @@
   - [Phase 5: Cleanup & Sealing](#phase-5-cleanup--sealing)
 - [Post-Clone Checklist](#-post-clone-checklist)
 - [Troubleshooting](#-troubleshooting)
+- [CKA Exam Tips](#-cka-exam-tips)
 - [References](#-references)
 
 ---
@@ -159,19 +160,19 @@ flowchart LR
 ## 💾 Partition Layout
 
 ```
-┌──────────────────────────────────────────────────┐
-│                40 GB Virtual Disk                │
+┌─────────────────────────────────────────────────┐
+│              40 GB Virtual Disk                  │
 ├──────────┬──────┬───────────┬────────────────────┤
-│   EFI    │/boot │  / (Root) │    /var            │
-│   1 GB   │ 2 GB │  15 GB    │    ~22 GB          │
-│          │ Ext4 │ Ext4/XFS  │    Ext4/XFS        │
-│ Boot     │Kernel│    OS     │ containerd images  │
-│ loader   │files │  files    │ kubelet data       │
-│          │      │           │ logs (journald)    │
-│          │      │           │ etcd data          │
+│   EFI    │/boot │  / (Root) │    /var             │
+│   1 GB   │ 2 GB │  15 GB    │    ~22 GB           │
+│          │ Ext4 │ Ext4/XFS  │    Ext4/XFS         │
+│ Boot     │Kernel│    OS     │ containerd images   │
+│ loader   │files │  files    │ kubelet data        │
+│          │      │           │ logs (journald)     │
+│          │      │           │ etcd data           │
 ├──────────┴──────┴───────────┴────────────────────┤
-│                 NO SWAP PARTITION                │
-└──────────────────────────────────────────────────┘
+│              ❌ NO SWAP PARTITION                 │
+└─────────────────────────────────────────────────┘
 ```
 
 > **Why separate `/var`?** If containers or logs fill up `/var`, the root filesystem stays intact — you can still SSH in and fix the problem.
@@ -215,6 +216,10 @@ chmod +x scripts/*.sh
 | 2.1 | Update packages & disable swap | Defense-in-depth: prevent OS/cloud-init from creating swap files |
 | 2.2 | Enable NTP & expand system limits | etcd requires synchronized clocks; web apps need high file descriptors |
 | 2.3 | Journald log rotation & disable unused services | Prevent `/var` from filling up; remove UFW/snapd/multipathd conflicts |
+
+> 💡 **Note — VM Guest Agents:** If running on **VMware**, ensure `open-vm-tools` is installed (included by default on Ubuntu Server 24.04). If deploying this template on **Proxmox**, install `qemu-guest-agent` instead to enable proper VM management from the hypervisor.
+
+> 📝 **Note — Swap in newer Kubernetes:** Kubernetes v1.28+ introduced beta support for swap memory via the `NodeSwap` feature gate. However, disabling swap entirely remains the safest and most trouble-free approach for Home Lab and CKA practice environments.
 
 ---
 
@@ -285,6 +290,12 @@ sudo kubeadm init --pod-network-cidr=10.244.0.0/16
 # 6. On Worker nodes: kubeadm join <token>
 ```
 
+> 💡 **Tip — Kubelet Node IP:** If your VM has multiple network interfaces (e.g., management + cluster networks), kubelet may pick the wrong IP. Fix this by specifying the correct IP in `/etc/default/kubelet`:
+> ```bash
+> echo 'KUBELET_EXTRA_ARGS="--node-ip=<CORRECT_IP>"' | sudo tee /etc/default/kubelet
+> sudo systemctl daemon-reload && sudo systemctl restart kubelet
+> ```
+
 ---
 
 ## 🔧 Troubleshooting
@@ -325,6 +336,29 @@ Update `/etc/containerd/config.toml` if the version differs.
 This is normal before installing a CNI plugin. Install Calico or Cilium, then nodes will transition to Ready.
 </details>
 
+<details>
+<summary><b>kubelet picks wrong IP address on multi-NIC VMs</b></summary>
+
+If your VM has multiple network interfaces, kubelet may register with the wrong IP. Set the correct one explicitly:
+```bash
+echo 'KUBELET_EXTRA_ARGS="--node-ip=<CORRECT_IP>"' | sudo tee /etc/default/kubelet
+sudo systemctl daemon-reload && sudo systemctl restart kubelet
+```
+</details>
+
+---
+
+## 🎓 CKA Exam Tips
+
+If you're using this template to prepare for the **Certified Kubernetes Administrator (CKA)** exam, here are some relevant tips:
+
+| Topic | How This Template Helps |
+|-------|------------------------|
+| **Cluster Upgrade** | Phase 4 uses `apt-mark hold` to lock package versions. The CKA exam tests your ability to `unhold` → upgrade `kubeadm/kubelet/kubectl` to a specific version → `hold` again. Practicing with this template builds muscle memory for that process. |
+| **etcd Backup & Restore** | The partition layout separates `/var` which contains etcd data. This structure supports adding automated etcd backup scripts in the future — a critical CKA exam topic. |
+| **Node Troubleshooting** | The `crictl` configuration (Phase 3.3) lets you inspect containers directly on a node without Docker — an essential debugging skill tested in the CKA exam. |
+| **Networking** | The kernel modules and sysctl settings (Phase 3.1) are the foundation that makes pod-to-pod communication work. Understanding *why* `br_netfilter` and `ip_forward` are needed helps you troubleshoot networking questions on the exam. |
+
 ---
 
 ## 📚 References
@@ -333,20 +367,6 @@ This is normal before installing a CNI plugin. Install Calico or Cilium, then no
 - [Containerd Getting Started](https://github.com/containerd/containerd/blob/main/docs/getting-started.md)
 - [CKA Certification Curriculum](https://github.com/cncf/curriculum)
 - [Ubuntu 24.04 Server Guide](https://ubuntu.com/server/docs)
-
----
-
-## ⚠️ Disclaimer
-
-> **Warning:** The scripts in this repository are primarily designed for **Home Lab / CKA Practice** environments.
->
-> If you plan to use them in a **Production** environment, please:
-> - ✅ Review and test all scripts in a staging environment before deployment
-> - ✅ Adjust IP addresses, DNS settings, and Kubernetes versions to match your infrastructure
-> - ✅ Verify your organization's security policies before disabling UFW or modifying system limits
-> - ✅ Always take a snapshot or backup before running any scripts
->
-> The author assumes no responsibility for any damage caused by using these scripts without proper review.
 
 ---
 

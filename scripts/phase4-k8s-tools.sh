@@ -33,30 +33,37 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+export DEBIAN_FRONTEND=noninteractive
+
 #---------------------------------------
 # 4.1 Add Kubernetes Apt Repository
 #---------------------------------------
 log_step "Installing prerequisite packages..."
-apt-get install -y apt-transport-https ca-certificates curl gpg
+apt-get install -yq apt-transport-https ca-certificates curl gpg
 
 log_step "Creating keyrings directory..."
 mkdir -p /etc/apt/keyrings
 
 log_step "Adding Kubernetes v${K8S_VERSION} apt repository..."
+# Added --yes to prevent interactive prompts if the file already exists
 curl -fsSL "https://pkgs.k8s.io/core:/stable:/v${K8S_VERSION}/deb/Release.key" \
-    | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    | gpg --dearmor --yes -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${K8S_VERSION}/deb/ /" \
-    | tee /etc/apt/sources.list.d/kubernetes.list
+    | tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
 
 #---------------------------------------
 # 4.2 Install Kubernetes Components
 #---------------------------------------
 log_step "Updating package index..."
-apt-get update
+apt-get update -yq
 
 log_step "Installing kubeadm, kubelet, and kubectl..."
-apt-get install -y kubelet kubeadm kubectl
+# CKA Tip: To find exact versions available, use: apt-cache madison kubeadm
+apt-get install -yq kubelet kubeadm kubectl
+
+log_step "Enabling kubelet service..."
+systemctl enable kubelet
 
 #---------------------------------------
 # 4.3 Lock Package Versions

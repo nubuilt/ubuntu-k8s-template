@@ -31,7 +31,7 @@ fi
 # 3.1 Kernel Modules & Network Routing
 #---------------------------------------
 log_step "Loading required kernel modules (overlay, br_netfilter)..."
-cat <<EOF | tee /etc/modules-load.d/k8s.conf
+cat <<EOF | tee /etc/modules-load.d/k8s.conf > /dev/null
 overlay
 br_netfilter
 EOF
@@ -39,7 +39,7 @@ modprobe overlay
 modprobe br_netfilter
 
 log_step "Configuring sysctl for IPv4 forwarding and iptables bridging..."
-cat <<EOF | tee /etc/sysctl.d/k8s-net.conf
+cat <<EOF | tee /etc/sysctl.d/k8s-net.conf > /dev/null
 net.bridge.bridge-nf-call-iptables  = 1
 net.bridge.bridge-nf-call-ip6tables = 1
 net.ipv4.ip_forward                 = 1
@@ -57,8 +57,9 @@ fi
 # 3.2 Fix CoreDNS Loop & Add Fallback DNS
 #---------------------------------------
 log_step "Fixing systemd-resolved stub listener (CoreDNS loop prevention)..."
-sed -i 's/#DNSStubListener=yes/DNSStubListener=no/' /etc/systemd/resolved.conf
-sed -i 's/#FallbackDNS=/FallbackDNS=8.8.8.8 1.1.1.1/' /etc/systemd/resolved.conf
+# Use regex to match whether it's commented or not, and replace the whole line
+sed -i 's/^#*DNSStubListener=.*/DNSStubListener=no/' /etc/systemd/resolved.conf
+sed -i 's/^#*FallbackDNS=.*/FallbackDNS=8.8.8.8 1.1.1.1/' /etc/systemd/resolved.conf
 systemctl restart systemd-resolved
 
 log_step "Reconfiguring /etc/resolv.conf symlink..."
@@ -76,8 +77,9 @@ fi
 #---------------------------------------
 # 3.3 Containerd & crictl Configuration
 #---------------------------------------
-log_step "Installing containerd..."
-apt-get install -y containerd
+log_step "Installing containerd (Non-interactive)..."
+export DEBIAN_FRONTEND=noninteractive
+apt-get install -yq containerd
 
 log_step "Generating default containerd configuration..."
 mkdir -p /etc/containerd
@@ -94,7 +96,7 @@ systemctl restart containerd
 systemctl enable containerd
 
 log_step "Configuring crictl to use containerd endpoint..."
-cat <<EOF | tee /etc/crictl.yaml
+cat <<EOF | tee /etc/crictl.yaml > /dev/null
 runtime-endpoint: unix:///run/containerd/containerd.sock
 image-endpoint: unix:///run/containerd/containerd.sock
 timeout: 2

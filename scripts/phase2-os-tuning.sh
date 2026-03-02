@@ -31,15 +31,18 @@ fi
 #---------------------------------------
 # 2.1 Update System & Disable Swap
 #---------------------------------------
-log_step "Updating system packages..."
-apt-get update && apt-get upgrade -y
+log_step "Updating system packages (Non-interactive)..."
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -yq
+apt-get upgrade -yq -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
 
 log_step "Disabling swap (defense-in-depth)..."
 swapoff -a
-sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+# Use a more robust regex to comment out swap lines in fstab
+sed -i '/\sswap\s/s/^/#/' /etc/fstab
 
-# Verify
-if free | grep -q "Swap:            0"; then
+# Verify using swapon (returns empty if no swap is active)
+if [[ -z "$(swapon --show)" ]]; then
     log_step "✅ Swap is disabled"
 else
     log_warn "Swap may still be active — check manually with 'free -h'"
@@ -52,7 +55,7 @@ log_step "Enabling NTP time synchronization..."
 timedatectl set-ntp true
 
 log_step "Expanding system limits (file-max, inotify)..."
-cat <<EOF | tee /etc/sysctl.d/k8s-limits.conf
+cat <<EOF | tee /etc/sysctl.d/k8s-limits.conf > /dev/null
 fs.file-max = 2097152
 fs.inotify.max_user_watches = 524288
 fs.inotify.max_user_instances = 8192
@@ -64,7 +67,7 @@ sysctl --system > /dev/null 2>&1
 #---------------------------------------
 log_step "Configuring journald log rotation (1GB / 7 days)..."
 mkdir -p /etc/systemd/journald.conf.d
-cat <<EOF | tee /etc/systemd/journald.conf.d/size.conf
+cat <<EOF | tee /etc/systemd/journald.conf.d/size.conf > /dev/null
 [Journal]
 SystemMaxUse=1G
 MaxRetentionSec=7day
@@ -89,5 +92,13 @@ log_step "  - System limits expanded"
 log_step "  - Log rotation configured"
 log_step "  - Unnecessary services disabled"
 log_step "============================================"
+
+# Check if reboot is required due to package updates
+if [ -f /var/run/reboot-required ]; then
+    echo ""
+    log_warn "A system reboot is required due to package updates (e.g., Kernel)."
+    log_warn "It is recommended to reboot before proceeding to Phase 3."
+fi
+
 echo ""
 log_step "Next: Run phase3-container-networking.sh"
